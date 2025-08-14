@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="./">
+    <title>DDR控制器设计完全指南</title>
+    <link rel="stylesheet" href="assets/style.css">
+    <link rel="stylesheet" href="assets/highlight.css">
+    <script src="assets/script.js" defer></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$']],
+                displayMath: [['$$', '$$']],
+                processEscapes: false,
+                packages: {'[+]': ['noerrors', 'ams']}
+            },
+            options: {
+                ignoreHtmlClass: 'tex2jax_ignore',
+                processHtmlClass: 'tex2jax_process'
+            },
+            loader: {
+                load: ['[tex]/noerrors', '[tex]/ams']
+            }
+        };
+    </script>
+</head>
+<body>
+    <div class="container">
+        <nav id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h3>目录</h3>
+                <button id="sidebar-toggle" class="sidebar-toggle">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+            <div class="sidebar-search">
+                <input type="text" id="sidebar-search-input" placeholder="搜索..." autocomplete="off">
+            </div>
+            <div id="tree-container">
+                <nav class="tree-nav" role="tree">
+                    <div class="tree-item active" >
+                        <a href="index.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">DDR控制器设计完全指南</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter1.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第1章：DDR技术演进与基础协议</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter2.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第2章：控制器架构级决策</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter3.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第3章：PHY层设计与电气特性</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter4.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第4章：训练序列与校准机制</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter5.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第5章：时序参数与控制策略</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter6.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第6章：QoS机制与仲裁策略</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter7.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第7章：功耗优化技术</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter8.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第8章：可观测性与性能量化</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter9.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第9章：验证策略与健壮性设计</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter10.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第10章：典型调参流程</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter11.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第11章：常见问题与对策</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter12.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第12章：快速参数模板与最佳实践</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="CLAUDE.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">Untitled</span>
+                        </a>
+                    </div>
+                </nav>
+            </div>
+        </nav>
+        
+        <main class="content">
+            <article>
+                <h1 id="ddr">DDR控制器设计完全指南</h1>
+<h2 id="_1">关于本教程</h2>
+<p>本教程系统介绍DDR内存控制器的设计原理与实践，从基础协议到高级优化策略，覆盖架构设计、时序控制、信号完整性、功耗管理等核心主题。面向有编程经验的工程师和研究人员，帮助读者深入理解DDR控制器的设计精髓。</p>
+<h3 id="_2">目标读者</h3>
+<ul>
+<li>系统架构师和VLSI设计工程师</li>
+<li>从事高性能计算的软件工程师</li>
+<li>AI加速器和SoC设计人员</li>
+<li>对内存系统优化感兴趣的研究人员</li>
+</ul>
+<h3 id="_3">学习路径</h3>
+<p>本教程采用渐进式学习路径：</p>
+<ol>
+<li><strong>基础篇</strong>（第1-3章）：DDR协议基础和控制器架构</li>
+<li><strong>核心篇</strong>（第4-7章）：时序控制、PHY设计、QoS仲裁</li>
+<li><strong>进阶篇</strong>（第8-10章）：功耗优化、可观测性、验证方法</li>
+<li><strong>实践篇</strong>（第11-12章）：调参流程和最佳实践</li>
+</ol>
+<hr />
+<h2 id="_4">章节目录</h2>
+<h3 id="1ddr"><a href="chapter1.html">第1章：DDR技术演进与基础协议</a></h3>
+<p>深入理解DDR内存的发展历程和核心协议，建立扎实的理论基础。</p>
+<ul>
+<li>DDR技术演进史：从SDR到DDR5</li>
+<li>DDR4/DDR5协议核心概念</li>
+<li>命令序列与状态机</li>
+<li>时序参数体系详解</li>
+<li>Bank Group架构与并行性</li>
+<li>练习：时序参数计算与优化</li>
+</ul>
+<h3 id="2"><a href="chapter2.html">第2章：控制器架构级决策</a></h3>
+<p>探讨DDR控制器的顶层架构设计和关键技术权衡。</p>
+<ul>
+<li>控制器在系统中的定位</li>
+<li>前端接口设计（AXI/ACE/CHI）</li>
+<li>命令队列与调度架构</li>
+<li>数据通路设计</li>
+<li>多通道与交织策略</li>
+<li>练习：架构性能建模</li>
+</ul>
+<h3 id="3phy"><a href="chapter3.html">第3章：PHY层设计与电气特性</a></h3>
+<p>深入PHY层的电路设计和信号完整性挑战。</p>
+<ul>
+<li>DFI接口标准</li>
+<li>时钟架构与DLL/PLL设计</li>
+<li>信号完整性：ODT、驱动强度、Slew Rate</li>
+<li>数据通路：DQ/DQS对齐</li>
+<li>阻抗匹配与端接策略</li>
+<li>练习：信号完整性分析</li>
+</ul>
+<h3 id="4"><a href="chapter4.html">第4章：训练序列与校准机制</a></h3>
+<p>掌握DDR初始化和运行时校准的核心技术。</p>
+<ul>
+<li>初始化序列设计</li>
+<li>Write Leveling原理与实现</li>
+<li>Read训练：DQS Gate和数据眼图</li>
+<li>CA训练与Vref优化</li>
+<li>周期性校准策略</li>
+<li>练习：训练算法优化</li>
+</ul>
+<h3 id="5"><a href="chapter5.html">第5章：时序参数与控制策略</a></h3>
+<p>精确控制DDR时序，实现性能与稳定性的平衡。</p>
+<ul>
+<li>核心时序参数深度解析</li>
+<li>Refresh管理与优化</li>
+<li>Page策略：Open/Close/Adaptive</li>
+<li>Bank调度算法</li>
+<li>时序违例检测与处理</li>
+<li>练习：调度算法设计</li>
+</ul>
+<h3 id="6qos"><a href="chapter6.html">第6章：QoS机制与仲裁策略</a></h3>
+<p>设计高效的服务质量保证和请求仲裁机制。</p>
+<ul>
+<li>QoS需求分析与建模</li>
+<li>优先级调度框架</li>
+<li>带宽分配与信用机制</li>
+<li>延迟敏感型调度</li>
+<li>公平性与饥饿避免</li>
+<li>练习：QoS策略评估</li>
+</ul>
+<h3 id="7"><a href="chapter7.html">第7章：功耗优化技术</a></h3>
+<p>实现DDR系统的能效最优化。</p>
+<ul>
+<li>功耗模型与分析</li>
+<li>低功耗状态管理（Self-Refresh、Power-Down）</li>
+<li>动态频率调节（DFS）</li>
+<li>部分阵列自刷新（PASR）</li>
+<li>温度管理与节流</li>
+<li>练习：功耗优化方案设计</li>
+</ul>
+<h3 id="8"><a href="chapter8.html">第8章：可观测性与性能量化</a></h3>
+<p>建立完善的监控和分析体系。</p>
+<ul>
+<li>性能计数器设计</li>
+<li>带宽利用率分析</li>
+<li>延迟分解与瓶颈定位</li>
+<li>实时监控架构</li>
+<li>调试接口与追踪机制</li>
+<li>练习：性能分析实践</li>
+</ul>
+<h3 id="9"><a href="chapter9.html">第9章：验证策略与健壮性设计</a></h3>
+<p>确保DDR控制器的正确性和可靠性。</p>
+<ul>
+<li>功能验证方法学</li>
+<li>协议检查器设计</li>
+<li>压力测试场景</li>
+<li>ECC与RAS特性</li>
+<li>错误注入与恢复</li>
+<li>练习：验证计划制定</li>
+</ul>
+<h3 id="10"><a href="chapter10.html">第10章：典型调参流程</a></h3>
+<p>掌握DDR控制器的调试和优化实践。</p>
+<ul>
+<li>参数扫描方法</li>
+<li>性能调优步骤</li>
+<li>稳定性边界测试</li>
+<li>自动化调参工具</li>
+<li>问题诊断流程</li>
+<li>练习：调参案例分析</li>
+</ul>
+<h3 id="11"><a href="chapter11.html">第11章：常见问题与对策</a></h3>
+<p>总结DDR设计中的典型陷阱和解决方案。</p>
+<ul>
+<li>时序收敛问题</li>
+<li>信号完整性调试</li>
+<li>兼容性问题处理</li>
+<li>性能瓶颈分析</li>
+<li>功耗异常排查</li>
+<li>练习：问题诊断实战</li>
+</ul>
+<h3 id="12"><a href="chapter12.html">第12章：快速参数模板与最佳实践</a></h3>
+<p>提供实用的设计模板和经验总结。</p>
+<ul>
+<li>不同应用场景的参数配置</li>
+<li>性能vs功耗权衡模板</li>
+<li>设计审查检查清单</li>
+<li>项目风险评估</li>
+<li>技术选型指南</li>
+<li>练习：方案设计实践</li>
+</ul>
+<hr />
+<h2 id="_5">附录</h2>
+<h3 id="addr4ddr5"><a href="appendix_a.html">附录A：DDR4/DDR5参数速查表</a></h3>
+<p>常用时序参数和电气特性汇总</p>
+<h3 id="b"><a href="appendix_b.html">附录B：术语表</a></h3>
+<p>DDR领域专业术语解释</p>
+<h3 id="c"><a href="appendix_c.html">附录C：参考文献</a></h3>
+<p>标准规范和推荐阅读材料</p>
+<hr />
+<h2 id="_6">如何使用本教程</h2>
+<h3 id="_7">学习建议</h3>
+<ol>
+<li><strong>循序渐进</strong>：建议按章节顺序学习，每章的知识都建立在前面章节的基础上</li>
+<li><strong>动手实践</strong>：完成每章的练习题，加深理解</li>
+<li><strong>查阅规范</strong>：配合JEDEC标准文档学习，理解规范细节</li>
+<li><strong>交流讨论</strong>：欢迎在Issues中提出问题和分享经验</li>
+</ol>
+<h3 id="_8">练习题说明</h3>
+<ul>
+<li>每章包含6-8道练习题</li>
+<li>题目分为基础题和挑战题两类</li>
+<li>提供解题提示（Hint）</li>
+<li>答案在<detail>中，建议先独立思考再查看</li>
+</ul>
+<h3 id="_9">代码和工具</h3>
+<p>本教程聚焦架构和算法层面，不包含具体RTL代码，但会提供：</p>
+<ul>
+<li>伪代码和算法描述</li>
+<li>架构图和时序图</li>
+<li>性能分析模型</li>
+<li>参数计算公式</li>
+</ul>
+<hr />
+<hr />
+<h2 id="_10">版权声明</h2>
+<p>本教程采用 CC BY-SA 4.0 协议发布，欢迎分享和改编，但请注明出处。</p>
+<hr />
+<h2 id="_11">联系方式</h2>
+<p>如有问题或建议，请通过GitHub Issues联系。</p>
+            </article>
+            
+            <nav class="page-nav"><a href="chapter1.html" class="nav-link next">第1章：DDR技术演进与基础协议 →</a></nav>
+        </main>
+    </div>
+</body>
+</html>

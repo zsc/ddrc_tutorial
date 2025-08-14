@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="./">
+    <title>第6章：QoS机制与仲裁策略</title>
+    <link rel="stylesheet" href="assets/style.css">
+    <link rel="stylesheet" href="assets/highlight.css">
+    <script src="assets/script.js" defer></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$']],
+                displayMath: [['$$', '$$']],
+                processEscapes: false,
+                packages: {'[+]': ['noerrors', 'ams']}
+            },
+            options: {
+                ignoreHtmlClass: 'tex2jax_ignore',
+                processHtmlClass: 'tex2jax_process'
+            },
+            loader: {
+                load: ['[tex]/noerrors', '[tex]/ams']
+            }
+        };
+    </script>
+</head>
+<body>
+    <div class="container">
+        <nav id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h3>目录</h3>
+                <button id="sidebar-toggle" class="sidebar-toggle">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+            <div class="sidebar-search">
+                <input type="text" id="sidebar-search-input" placeholder="搜索..." autocomplete="off">
+            </div>
+            <div id="tree-container">
+                <nav class="tree-nav" role="tree">
+                    <div class="tree-item " >
+                        <a href="index.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">DDR控制器设计完全指南</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter1.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第1章：DDR技术演进与基础协议</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter2.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第2章：控制器架构级决策</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter3.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第3章：PHY层设计与电气特性</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter4.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第4章：训练序列与校准机制</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter5.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第5章：时序参数与控制策略</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item active" >
+                        <a href="chapter6.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第6章：QoS机制与仲裁策略</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter7.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第7章：功耗优化技术</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter8.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第8章：可观测性与性能量化</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter9.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第9章：验证策略与健壮性设计</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter10.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第10章：典型调参流程</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter11.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第11章：常见问题与对策</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="chapter12.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">第12章：快速参数模板与最佳实践</span>
+                        </a>
+                    </div>
+                
+                    <div class="tree-item " >
+                        <a href="CLAUDE.html" class="tree-link">
+                            <span class="tree-icon">📄</span>
+                            <span class="tree-title">Untitled</span>
+                        </a>
+                    </div>
+                </nav>
+            </div>
+        </nav>
+        
+        <main class="content">
+            <article>
+                <h1 id="6qos">第6章：QoS机制与仲裁策略</h1>
+<h2 id="_1">本章概述</h2>
+<p>在现代SoC系统中，DDR控制器需要同时服务多个具有不同性能需求的主设备：CPU需要低延迟访问以保证执行效率，GPU需要高带宽吞吐以满足渲染需求，实时设备需要确定性的响应时间，而DMA传输则追求整体效率。如何在有限的内存带宽下合理分配资源、保证各类请求的服务质量（QoS），是DDR控制器设计的核心挑战之一。</p>
+<p>本章将深入探讨DDR控制器的QoS机制设计，从需求建模到具体的仲裁算法实现，涵盖优先级调度、带宽管理、延迟控制等关键技术。通过学习本章内容，您将掌握如何设计一个既能满足性能需求、又能保证公平性的高效仲裁系统。</p>
+<h2 id="61-qos">6.1 QoS需求分析与建模</h2>
+<h3 id="611-qos">6.1.1 系统级QoS需求分类</h3>
+<p>不同类型的主设备对内存访问有着截然不同的QoS需求，理解这些需求特征是设计仲裁机制的第一步。</p>
+<p><strong>延迟敏感型（Latency-Sensitive）</strong></p>
+<ul>
+<li>CPU取指和Load/Store操作：每个周期的延迟都直接影响IPC</li>
+<li>中断处理和异常响应：需要确定性的最坏延迟保证</li>
+<li>特征：请求频繁但数据量小，对平均延迟和尾延迟都很敏感</li>
+</ul>
+<p><strong>带宽敏感型（Bandwidth-Sensitive）</strong></p>
+<ul>
+<li>GPU渲染和计算：需要持续的高带宽供给</li>
+<li>视频编解码：有最小带宽要求，低于阈值会导致丢帧</li>
+<li>特征：突发传输大量数据，对瞬时带宽波动敏感</li>
+</ul>
+<p><strong>实时型（Real-Time）</strong></p>
+<ul>
+<li>显示控制器：必须在固定时间窗口内完成帧缓冲读取</li>
+<li>音频处理：需要周期性的确定性访问</li>
+<li>特征：有严格的deadline要求，错过会导致用户可感知的故障</li>
+</ul>
+<p><strong>尽力而为型（Best-Effort）</strong></p>
+<ul>
+<li>后台DMA传输：对延迟和带宽都不敏感</li>
+<li>预取操作：可以被高优先级请求抢占</li>
+<li>特征：可以利用系统空闲时段，不影响关键路径性能</li>
+</ul>
+<h3 id="612-qos">6.1.2 QoS参数量化模型</h3>
+<p>为了精确描述和评估QoS需求，需要建立量化的参数模型：</p>
+<p><strong>延迟模型</strong></p>
+<div class="codehilite"><pre><span></span><code>延迟分解：
+Latency_total = Latency_queue + Latency_arbitration + Latency_command + Latency_data
+
+其中：
+
+<span class="k">-</span> Latency_queue: 请求在队列中的等待时间
+<span class="k">-</span> Latency_arbitration: 仲裁决策时间
+<span class="k">-</span> Latency_command: DDR命令发送和执行时间
+<span class="k">-</span> Latency_data: 数据传输时间
+
+关键指标：
+
+<span class="k">-</span> Average Latency: 平均延迟
+<span class="k">-</span> P99 Latency: 99分位延迟
+<span class="k">-</span> Maximum Latency: 最坏情况延迟
+</code></pre></div>
+
+<p><strong>带宽模型</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">带宽利用率</span><span class="err">：</span>
+<span class="n">BW_efficiency</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BW_actual</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">BW_theoretical</span>
+
+<span class="n">其中</span><span class="err">：</span>
+<span class="n">BW_theoretical</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Frequency</span><span class="w"> </span><span class="err">×</span><span class="w"> </span><span class="n">DataWidth</span><span class="w"> </span><span class="err">×</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">(</span><span class="n">DDR</span><span class="p">)</span>
+<span class="n">BW_actual</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DataTransferred</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="nc">Time</span>
+
+<span class="n">带宽分配</span><span class="err">：</span>
+<span class="n">BW_allocated</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Weight</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w"> </span><span class="err">×</span><span class="w"> </span><span class="n">BW_available</span>
+<span class="n">BW_guaranteed</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Min_BW</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w">  </span><span class="o">//</span><span class="w"> </span><span class="n">最小保证带宽</span>
+<span class="n">BW_maximum</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Max_BW</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w">      </span><span class="o">//</span><span class="w"> </span><span class="n">最大限制带宽</span>
+</code></pre></div>
+
+<p><strong>服务质量契约（SLA）</strong></p>
+<div class="codehilite"><pre><span></span><code>QoS Contract = {
+    Priority_Level,          // 优先级等级
+    Min_Bandwidth,          // 最小带宽保证
+    Max_Latency,           // 最大延迟限制
+    Burst_Size,            // 突发大小
+    Deadline,              // 完成时限
+    Preemptible            // 是否可抢占
+}
+</code></pre></div>
+
+<h3 id="613-qos">6.1.3 QoS需求建模实例</h3>
+<p>让我们通过一个典型的移动SoC系统来具体分析QoS需求：</p>
+<div class="codehilite"><pre><span></span><code>系统配置：
+
+- DDR4-3200, 32-bit数据宽度
+- 理论带宽：3200 × 32 / 8 = 12.8 GB/s
+
+主设备QoS需求：
+┌─────────────┬──────────┬───────────┬──────────┬─────────┐
+│   Master    │ Priority │ Min BW    │ Max Lat  │  Type   │
+├─────────────┼──────────┼───────────┼──────────┼─────────┤
+│ CPU Cluster │  High    │ 2.0 GB/s  │ 100 ns   │ Latency │
+│ GPU         │  Medium  │ 4.0 GB/s  │ 500 ns   │ Bandwidth│
+│ Display     │  Critical│ 1.5 GB/s  │ 200 ns   │ Real-time│
+│ Video Codec │  Medium  │ 2.0 GB/s  │ 1000 ns  │ Bandwidth│
+│ ISP         │  Medium  │ 1.0 GB/s  │ 500 ns   │ Mixed   │
+│ DMA         │  Low     │ 0.5 GB/s  │ No limit │ Best-effort│
+└─────────────┴──────────┴───────────┴──────────┴─────────┘
+
+总需求：11.0 GB/s (利用率 86%)
+</code></pre></div>
+
+<h2 id="62">6.2 优先级调度框架</h2>
+<h3 id="621">6.2.1 静态优先级调度</h3>
+<p>静态优先级是最基础的QoS机制，每个主设备或请求类型被赋予固定的优先级。</p>
+<p><strong>基本实现</strong></p>
+<div class="codehilite"><pre><span></span><code>优先级队列结构：
+┌────────────────────────────────┐
+│     Priority Queue Manager      │
+├────────────────────────────────┤
+│  High Priority Queue  [P=3]    │ ← CPU, Interrupt
+│    ├─ Request 1                │
+│    ├─ Request 2                │
+│    └─ ...                      │
+├────────────────────────────────┤
+│  Medium Priority Queue [P=2]   │ ← GPU, Video
+│    ├─ Request 1                │
+│    └─ ...                      │
+├────────────────────────────────┤
+│  Normal Priority Queue [P=1]   │ ← General Traffic
+│    └─ ...                      │
+├────────────────────────────────┤
+│  Low Priority Queue   [P=0]    │ ← DMA, Prefetch
+│    └─ ...                      │
+└────────────────────────────────┘
+          ↓
+    Arbitration Logic
+          ↓
+     DDR Commands
+</code></pre></div>
+
+<p><strong>严格优先级的问题</strong></p>
+<ul>
+<li>饥饿问题：低优先级请求可能永远得不到服务</li>
+<li>优先级反转：高优先级请求被低优先级事务阻塞</li>
+<li>缺乏灵活性：无法适应动态变化的系统负载</li>
+</ul>
+<h3 id="622">6.2.2 动态优先级提升</h3>
+<p>为解决静态优先级的局限性，引入动态优先级提升机制：</p>
+<p><strong>年龄提升（Age-based Promotion）</strong></p>
+<div class="codehilite"><pre><span></span><code>动态优先级计算：
+Priority_effective = Priority_base + Age_factor × Waiting_time
+
+其中：
+
+<span class="k">-</span> Priority_base: 基础优先级
+<span class="k">-</span> Age_factor: 老化因子（可配置）
+<span class="k">-</span> Waiting_time: 在队列中的等待时间
+
+示例配置：
+if (Waiting_time &gt; Threshold_1) Priority += 1
+if (Waiting_time &gt; Threshold_2) Priority += 2
+if (Waiting_time &gt; Threshold_3) Priority = MAX_PRIORITY
+</code></pre></div>
+
+<p><strong>紧急度提升（Urgency-based Promotion）</strong></p>
+<div class="codehilite"><pre><span></span><code>基于deadline的优先级：
+Urgency = (Deadline - Current_time) / Service_time
+Priority_effective = f(Priority_base, Urgency)
+
+紧急度分级：
+
+<span class="k">-</span> Critical: Urgency &lt; 1.5  → 最高优先级
+<span class="k">-</span> Urgent:   Urgency &lt; 3.0  → 优先级+2
+<span class="k">-</span> Normal:   Urgency &lt; 5.0  → 优先级+1
+<span class="k">-</span> Relaxed:  Urgency ≥ 5.0  → 保持原优先级
+</code></pre></div>
+
+<h3 id="623">6.2.3 多级反馈队列</h3>
+<p>借鉴操作系统调度算法，实现多级反馈队列机制：</p>
+<div class="codehilite"><pre><span></span><code><span class="n">多级队列结构</span><span class="err">：</span>
+<span class="k">Level</span><span class="w"> </span><span class="mi">0</span><span class="err">:</span><span class="w"> </span><span class="n">Quantum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="k">transaction</span><span class="w">  </span><span class="o">[</span><span class="n">最高优先级</span><span class="o">]</span>
+<span class="k">Level</span><span class="w"> </span><span class="mi">1</span><span class="err">:</span><span class="w"> </span><span class="n">Quantum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="n">transactions</span>
+<span class="k">Level</span><span class="w"> </span><span class="mi">2</span><span class="err">:</span><span class="w"> </span><span class="n">Quantum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">8</span><span class="w"> </span><span class="n">transactions</span>
+<span class="k">Level</span><span class="w"> </span><span class="mi">3</span><span class="err">:</span><span class="w"> </span><span class="n">Quantum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">No</span><span class="w"> </span><span class="k">limit</span><span class="w">       </span><span class="o">[</span><span class="n">最低优先级</span><span class="o">]</span>
+
+<span class="n">调度规则</span><span class="err">：</span>
+
+<span class="mf">1.</span><span class="w"> </span><span class="n">新请求进入Level</span><span class="w"> </span><span class="mi">0</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">用完时间片降级到下一级</span>
+<span class="mf">3.</span><span class="w"> </span><span class="n">完成IO提升一级</span>
+<span class="mf">4.</span><span class="w"> </span><span class="n">长时间等待自动提升</span>
+
+<span class="n">状态转换</span><span class="err">：</span>
+<span class="w">    </span><span class="o">[</span><span class="n">New</span><span class="o">]</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="k">Level</span><span class="w"> </span><span class="mi">0</span>
+<span class="w">      </span><span class="err">↓</span><span class="w"> </span><span class="p">(</span><span class="n">quantum</span><span class="w"> </span><span class="n">expired</span><span class="p">)</span>
+<span class="w">    </span><span class="k">Level</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">      </span><span class="err">↓</span><span class="w"> </span><span class="err">↑</span><span class="w"> </span><span class="p">(</span><span class="n">promote</span><span class="w"> </span><span class="k">after</span><span class="w"> </span><span class="n">wait</span><span class="p">)</span>
+<span class="w">    </span><span class="k">Level</span><span class="w"> </span><span class="mi">2</span>
+<span class="w">      </span><span class="err">↓</span><span class="w"> </span><span class="err">↑</span>
+<span class="w">    </span><span class="k">Level</span><span class="w"> </span><span class="mi">3</span>
+</code></pre></div>
+
+<h2 id="63">6.3 带宽分配与信用机制</h2>
+<h3 id="631">6.3.1 带宽预留与分配</h3>
+<p><strong>静态带宽分配</strong></p>
+<div class="codehilite"><pre><span></span><code>带宽分配表：
+┌──────────┬────────────┬─────────────┬──────────┐
+│  Master  │ Reserved % │ Actual BW   │  Credits │
+├──────────┼────────────┼─────────────┼──────────┤
+│ CPU      │    20%     │  2.56 GB/s  │   256    │
+│ GPU      │    35%     │  4.48 GB/s  │   448    │
+│ Display  │    15%     │  1.92 GB/s  │   192    │
+│ Video    │    20%     │  2.56 GB/s  │   256    │
+│ Others   │    10%     │  1.28 GB/s  │   128    │
+└──────────┴────────────┴─────────────┴──────────┘
+
+周期性刷新：
+每个Epoch（如1000个时钟周期）重置信用值
+</code></pre></div>
+
+<p><strong>动态带宽调整</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">自适应算法</span><span class="err">：</span>
+
+<span class="mf">1.</span><span class="w"> </span><span class="n">监测实际使用率</span>
+<span class="w">   </span><span class="n">Utilization</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Used_BW</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">Allocated_BW</span><span class="o">[</span><span class="n">i</span><span class="o">]</span>
+
+<span class="mf">2.</span><span class="w"> </span><span class="n">重新分配未使用带宽</span>
+<span class="w">   </span><span class="n">Unused_BW</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Σ</span><span class="p">(</span><span class="n">Allocated</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">Used</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="p">)</span>
+<span class="w">   </span><span class="n">Extra</span><span class="o">[</span><span class="n">j</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Unused_BW</span><span class="w"> </span><span class="err">×</span><span class="w"> </span><span class="n">Weight</span><span class="o">[</span><span class="n">j</span><span class="o">]</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">Σ</span><span class="p">(</span><span class="n">Weight</span><span class="p">)</span>
+
+<span class="mf">3.</span><span class="w"> </span><span class="n">更新分配</span>
+<span class="w">   </span><span class="n">New_Allocated</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Base_Allocated</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">Extra</span><span class="o">[</span><span class="n">i</span><span class="o">]</span>
+</code></pre></div>
+
+<h3 id="632-credit-based">6.3.2 信用机制（Credit-based）</h3>
+<p><strong>基本信用系统</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">信用消耗与补充</span><span class="err">：</span>
+<span class="err">┌─────────────────────────────────────┐</span>
+<span class="err">│</span><span class="w">         </span><span class="n">Credit</span><span class="w"> </span><span class="n">Manager</span><span class="w">               </span><span class="err">│</span>
+<span class="err">├─────────────────────────────────────┤</span>
+<span class="err">│</span><span class="w"> </span><span class="n">Master</span><span class="w"> </span><span class="nl">A</span><span class="p">:</span><span class="w"> </span><span class="n">Credits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">100</span><span class="w">             </span><span class="err">│</span>
+<span class="err">│</span><span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Issue</span><span class="w"> </span><span class="nl">request</span><span class="p">:</span><span class="w"> </span><span class="n">Credits</span><span class="w"> </span><span class="o">-=</span><span class="w"> </span><span class="mi">8</span><span class="w">     </span><span class="err">│</span>
+<span class="err">│</span><span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Per</span><span class="w"> </span><span class="k">cycle</span><span class="err">:</span><span class="w"> </span><span class="n">Credits</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="mi">2</span><span class="w">         </span><span class="err">│</span>
+<span class="err">│</span><span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="nf">Max</span><span class="w"> </span><span class="nl">credits</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="w">                </span><span class="err">│</span>
+<span class="err">├─────────────────────────────────────┤</span>
+<span class="err">│</span><span class="w"> </span><span class="n">Master</span><span class="w"> </span><span class="nl">B</span><span class="p">:</span><span class="w"> </span><span class="n">Credits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">50</span><span class="w">              </span><span class="err">│</span>
+<span class="err">│</span><span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Issue</span><span class="w"> </span><span class="nl">request</span><span class="p">:</span><span class="w"> </span><span class="n">Credits</span><span class="w"> </span><span class="o">-=</span><span class="w"> </span><span class="mi">4</span><span class="w">     </span><span class="err">│</span>
+<span class="err">│</span><span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Per</span><span class="w"> </span><span class="k">cycle</span><span class="err">:</span><span class="w"> </span><span class="n">Credits</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="mi">1</span><span class="w">         </span><span class="err">│</span>
+<span class="err">│</span><span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="nf">Max</span><span class="w"> </span><span class="nl">credits</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="w">                </span><span class="err">│</span>
+<span class="err">└─────────────────────────────────────┘</span>
+
+<span class="n">仲裁决策</span><span class="err">：</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">Credits</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">Has_Request</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="p">)</span><span class="w"> </span><span class="err">{</span>
+<span class="w">    </span><span class="k">Grant</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">true</span><span class="p">;</span>
+<span class="w">    </span><span class="n">Credits</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w"> </span><span class="o">-=</span><span class="w"> </span><span class="n">Request_Size</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="p">;</span>
+<span class="err">}</span>
+</code></pre></div>
+
+<p><strong>分层信用机制</strong></p>
+<div class="codehilite"><pre><span></span><code>两级信用系统：
+Level 1: Guaranteed Credits (保证带宽)
+Level 2: Best-effort Credits (额外带宽)
+
+调度逻辑：
+
+1. 优先使用Guaranteed Credits
+2. Guaranteed用完后使用Best-effort Credits
+3. 两种信用独立计算和补充
+
+信用借贷：
+
+- 允许紧急请求借用未来信用
+- 设置最大透支额度
+- 透支后需要还清才能继续
+</code></pre></div>
+
+<h3 id="633">6.3.3 令牌桶算法</h3>
+<p>实现更精细的流量控制：</p>
+<div class="codehilite"><pre><span></span><code><span class="nt">令牌桶参数</span><span class="err">：</span>
+<span class="err">┌──────────────────────────────┐</span>
+<span class="err">│</span><span class="w">     </span><span class="nt">Token</span><span class="w"> </span><span class="nt">Bucket</span><span class="w">             </span><span class="err">│</span>
+<span class="err">├──────────────────────────────┤</span>
+<span class="err">│</span><span class="w"> </span><span class="nt">Bucket</span><span class="w"> </span><span class="nt">Size</span><span class="o">:</span><span class="w"> </span><span class="nt">1024</span><span class="w"> </span><span class="nt">tokens</span><span class="w">     </span><span class="err">│</span>
+<span class="err">│</span><span class="w"> </span><span class="nt">Fill</span><span class="w"> </span><span class="nt">Rate</span><span class="o">:</span><span class="w"> </span><span class="nt">100</span><span class="w"> </span><span class="nt">tokens</span><span class="o">/</span><span class="nt">cycle</span><span class="w">  </span><span class="err">│</span>
+<span class="err">│</span><span class="w"> </span><span class="nt">Current</span><span class="w"> </span><span class="nt">Tokens</span><span class="o">:</span><span class="w"> </span><span class="nt">756</span><span class="w">           </span><span class="err">│</span>
+<span class="err">└──────────────────────────────┘</span>
+
+<span class="nt">算法流程</span><span class="err">：</span>
+
+<span class="nt">1</span><span class="o">.</span><span class="w"> </span><span class="nt">初始化</span><span class="err">：</span><span class="nt">Tokens</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nt">Bucket_Size</span>
+<span class="nt">2</span><span class="o">.</span><span class="w"> </span><span class="nt">每周期</span><span class="err">：</span><span class="nt">Tokens</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="nt">Fill_Rate</span><span class="w"> </span><span class="o">(</span><span class="nt">不超过Bucket_Size</span><span class="o">)</span>
+<span class="nt">3</span><span class="o">.</span><span class="w"> </span><span class="nt">发送请求</span><span class="err">：</span>
+<span class="w">   </span><span class="nt">if</span><span class="w"> </span><span class="o">(</span><span class="nt">Tokens</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="nt">Request_Cost</span><span class="o">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">       </span><span class="err">Tokens</span><span class="w"> </span><span class="err">-=</span><span class="w"> </span><span class="err">Request_Cost</span><span class="p">;</span>
+<span class="w">       </span><span class="err">Grant_Request()</span><span class="p">;</span>
+<span class="w">   </span><span class="p">}</span><span class="w"> </span><span class="nt">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">       </span><span class="err">Queue_Request()</span><span class="p">;</span>
+<span class="w">   </span><span class="p">}</span>
+
+<span class="nt">突发处理</span><span class="err">：</span>
+
+<span class="nt">-</span><span class="w"> </span><span class="nt">桶满时可处理突发流量</span>
+<span class="nt">-</span><span class="w"> </span><span class="nt">Fill</span><span class="w"> </span><span class="nt">Rate决定平均带宽</span>
+<span class="nt">-</span><span class="w"> </span><span class="nt">Bucket</span><span class="w"> </span><span class="nt">Size决定突发容量</span>
+</code></pre></div>
+
+<h2 id="64">6.4 延迟敏感型调度</h2>
+<h3 id="641-sjf">6.4.1 最短作业优先（SJF）</h3>
+<p>针对不同大小的请求优化平均延迟：</p>
+<div class="codehilite"><pre><span></span><code><span class="nt">请求分类</span><span class="err">：</span>
+<span class="err">┌─────────────┬──────────┬────────────┐</span>
+<span class="err">│</span><span class="w"> </span><span class="nt">Request</span><span class="w"> </span><span class="nt">Type</span><span class="err">│</span><span class="w">   </span><span class="nt">Size</span><span class="w">   </span><span class="err">│</span><span class="w">  </span><span class="nt">Priority</span><span class="w">  </span><span class="err">│</span>
+<span class="err">├─────────────┼──────────┼────────────┤</span>
+<span class="err">│</span><span class="w"> </span><span class="nt">Cache</span><span class="w"> </span><span class="nt">Line</span><span class="w">  </span><span class="err">│</span><span class="w">  </span><span class="nt">64</span><span class="w"> </span><span class="nt">B</span><span class="w">    </span><span class="err">│</span><span class="w">    </span><span class="nt">High</span><span class="w">    </span><span class="err">│</span>
+<span class="err">│</span><span class="w"> </span><span class="nt">Partial</span><span class="w">     </span><span class="err">│</span><span class="w">  </span><span class="nt">128</span><span class="w"> </span><span class="nt">B</span><span class="w">   </span><span class="err">│</span><span class="w">   </span><span class="nt">Medium</span><span class="w">   </span><span class="err">│</span>
+<span class="err">│</span><span class="w"> </span><span class="nt">Full</span><span class="w"> </span><span class="nt">Burst</span><span class="w">  </span><span class="err">│</span><span class="w">  </span><span class="nt">256</span><span class="w"> </span><span class="nt">B</span><span class="w">   </span><span class="err">│</span><span class="w">   </span><span class="nt">Normal</span><span class="w">   </span><span class="err">│</span>
+<span class="err">│</span><span class="w"> </span><span class="nt">Block</span><span class="w">       </span><span class="err">│</span><span class="w">  </span><span class="nt">512</span><span class="w"> </span><span class="nt">B</span><span class="o">+</span><span class="w">  </span><span class="err">│</span><span class="w">    </span><span class="nt">Low</span><span class="w">     </span><span class="err">│</span>
+<span class="err">└─────────────┴──────────┴────────────┘</span>
+
+<span class="nt">调度策略</span><span class="err">：</span>
+
+<span class="nt">1</span><span class="o">.</span><span class="w"> </span><span class="nt">估算服务时间</span><span class="err">：</span>
+<span class="w">   </span><span class="nt">Service_Time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nt">Size</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="nt">Bandwidth</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nt">Fixed_Overhead</span>
+
+<span class="nt">2</span><span class="o">.</span><span class="w"> </span><span class="nt">按服务时间排序</span><span class="err">：</span>
+<span class="w">   </span><span class="nt">Priority_Queue</span><span class="p">.</span><span class="nc">sort</span><span class="o">(</span><span class="nt">by</span><span class="o">:</span><span class="w"> </span><span class="nt">Service_Time</span><span class="o">)</span>
+
+<span class="nt">3</span><span class="o">.</span><span class="w"> </span><span class="nt">防止大请求饥饿</span><span class="err">：</span>
+<span class="w">   </span><span class="nt">if</span><span class="w"> </span><span class="o">(</span><span class="nt">Large_Request</span><span class="p">.</span><span class="nc">Wait_Time</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="nt">Threshold</span><span class="o">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">       </span><span class="err">Boost_Priority(Large_Request)</span><span class="p">;</span>
+<span class="w">   </span><span class="p">}</span>
+</code></pre></div>
+
+<h3 id="642">6.4.2 关键路径识别</h3>
+<p>识别并优先处理影响系统性能的关键请求：</p>
+<div class="codehilite"><pre><span></span><code>关键路径标记：
+┌────────────────────────────────┐
+│   Critical Path Detection      │
+├────────────────────────────────┤
+│ CPU Instruction Fetch: ← Critical
+│ CPU Data Load (blocking): ← Critical
+│ CPU Data Store (posted): ← Normal
+│ GPU Texture Fetch: ← High
+│ GPU Frame Buffer: ← Normal
+│ Prefetch: ← Low
+└────────────────────────────────┘
+
+识别机制：
+
+1. 硬件标记：
+   - CPU发出的请求携带critical标志
+   - 根据指令类型自动判断
+
+2. 软件提示：
+   - 通过QoS字段指定关键性
+   - 编译器或OS标记关键路径
+
+3. 动态学习：
+   - 监测请求的后续影响
+   - 建立关键路径预测模型
+</code></pre></div>
+
+<h3 id="643">6.4.3 延迟目标调度</h3>
+<p>基于延迟目标（Latency Target）的调度算法：</p>
+<div class="codehilite"><pre><span></span><code>延迟目标管理：
+每个请求携带延迟目标：
+Request = {
+    Address,
+    Size,
+    Target_Latency,  // 期望完成时间
+    Arrival_Time     // 到达时间
+}
+
+松弛度计算：
+Slack = Target_Latency - Expected_Service_Time - (Current_Time - Arrival_Time)
+
+调度优先级：
+Priority = 1 / (Slack + ε)  // ε防止除零
+
+动态调整：
+if (Slack &lt; 0) {
+    // 已经违反目标
+    Priority = MAXIMUM;
+    Record_Violation();
+} else if (Slack &lt; Critical_Threshold) {
+    // 接近违反
+    Priority = HIGH;
+    Alert_System();
+}
+</code></pre></div>
+
+<h2 id="65">6.5 公平性与饥饿避免</h2>
+<h3 id="651">6.5.1 公平性度量</h3>
+<p>定义和评估调度公平性：</p>
+<div class="codehilite"><pre><span></span><code><span class="n">公平性指标</span><span class="err">：</span>
+
+<span class="mf">1.</span><span class="w"> </span><span class="n">Jain</span><span class="err">&#39;</span><span class="n">s</span><span class="w"> </span><span class="n">Fairness</span><span class="w"> </span><span class="k">Index</span><span class="err">:</span>
+<span class="w">   </span><span class="n">J</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">Σ</span><span class="p">(</span><span class="n">xi</span><span class="p">))</span><span class="n">²</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="err">×</span><span class="w"> </span><span class="n">Σ</span><span class="p">(</span><span class="n">xi²</span><span class="p">))</span>
+<span class="w">   </span><span class="n">其中xi是各主设备获得的带宽</span>
+<span class="w">   </span><span class="n">J</span><span class="w"> </span><span class="err">∈</span><span class="w"> </span><span class="o">[</span><span class="n">0,1</span><span class="o">]</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="n">表示完全公平</span>
+
+<span class="mf">2.</span><span class="w"> </span><span class="nf">Max</span><span class="o">-</span><span class="nf">Min</span><span class="w"> </span><span class="nl">Fairness</span><span class="p">:</span>
+<span class="w">   </span><span class="n">最大化最小份额</span>
+<span class="w">   </span><span class="nf">max</span><span class="p">(</span><span class="nf">min</span><span class="p">(</span><span class="n">BW</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">Demand</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="p">))</span>
+
+<span class="mf">3.</span><span class="w"> </span><span class="n">Proportional</span><span class="w"> </span><span class="nl">Fairness</span><span class="p">:</span>
+<span class="w">   </span><span class="n">按权重比例分配</span>
+<span class="w">   </span><span class="n">BW</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">Weight</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Constant</span>
+
+<span class="n">监测示例</span><span class="err">：</span>
+<span class="err">┌──────────┬─────────┬────────┬──────────┐</span>
+<span class="err">│</span><span class="w">  </span><span class="n">Master</span><span class="w">  </span><span class="err">│</span><span class="w"> </span><span class="n">Expected</span><span class="err">│</span><span class="w"> </span><span class="n">Actual</span><span class="w"> </span><span class="err">│</span><span class="w"> </span><span class="n">Fairness</span><span class="w"> </span><span class="err">│</span>
+<span class="err">├──────────┼─────────┼────────┼──────────┤</span>
+<span class="err">│</span><span class="w">  </span><span class="n">CPU</span><span class="w">     </span><span class="err">│</span><span class="w">  </span><span class="mi">25</span><span class="o">%</span><span class="w">    </span><span class="err">│</span><span class="w">  </span><span class="mi">23</span><span class="o">%</span><span class="w">   </span><span class="err">│</span><span class="w">   </span><span class="mf">0.92</span><span class="w">   </span><span class="err">│</span>
+<span class="err">│</span><span class="w">  </span><span class="n">GPU</span><span class="w">     </span><span class="err">│</span><span class="w">  </span><span class="mi">40</span><span class="o">%</span><span class="w">    </span><span class="err">│</span><span class="w">  </span><span class="mi">42</span><span class="o">%</span><span class="w">   </span><span class="err">│</span><span class="w">   </span><span class="mf">1.05</span><span class="w">   </span><span class="err">│</span>
+<span class="err">│</span><span class="w">  </span><span class="n">Display</span><span class="w"> </span><span class="err">│</span><span class="w">  </span><span class="mi">20</span><span class="o">%</span><span class="w">    </span><span class="err">│</span><span class="w">  </span><span class="mi">19</span><span class="o">%</span><span class="w">   </span><span class="err">│</span><span class="w">   </span><span class="mf">0.95</span><span class="w">   </span><span class="err">│</span>
+<span class="err">│</span><span class="w">  </span><span class="n">Others</span><span class="w">  </span><span class="err">│</span><span class="w">  </span><span class="mi">15</span><span class="o">%</span><span class="w">    </span><span class="err">│</span><span class="w">  </span><span class="mi">16</span><span class="o">%</span><span class="w">   </span><span class="err">│</span><span class="w">   </span><span class="mf">1.07</span><span class="w">   </span><span class="err">│</span>
+<span class="err">└──────────┴─────────┴────────┴──────────┘</span>
+<span class="n">Overall</span><span class="w"> </span><span class="n">Fairness</span><span class="w"> </span><span class="k">Index</span><span class="err">:</span><span class="w"> </span><span class="mf">0.96</span>
+</code></pre></div>
+
+<h3 id="652">6.5.2 饥饿检测与预防</h3>
+<p><strong>饥饿检测机制</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">监测参数</span><span class="err">：</span>
+
+<span class="o">-</span><span class="w"> </span><span class="nl">Max_Wait_Time</span><span class="p">:</span><span class="w"> </span><span class="n">最大等待时间</span>
+<span class="o">-</span><span class="w"> </span><span class="nl">Min_Service_Rate</span><span class="p">:</span><span class="w"> </span><span class="n">最小服务速率</span>
+<span class="o">-</span><span class="w"> </span><span class="nl">Starvation_Threshold</span><span class="p">:</span><span class="w"> </span><span class="n">饥饿判定阈值</span>
+
+<span class="n">检测逻辑</span><span class="err">：</span>
+<span class="k">for</span><span class="w"> </span><span class="k">each</span><span class="w"> </span><span class="n">request</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="nl">queue</span><span class="p">:</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="k">Current_Time</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">Arrival_Time</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">Max_Wait_Time</span><span class="p">)</span><span class="w"> </span><span class="err">{</span>
+<span class="w">        </span><span class="n">Flag_Starvation</span><span class="p">(</span><span class="n">request</span><span class="p">);</span>
+<span class="w">        </span><span class="n">Boost_to_Maximum_Priority</span><span class="p">(</span><span class="n">request</span><span class="p">);</span>
+<span class="w">    </span><span class="err">}</span>
+
+<span class="k">for</span><span class="w"> </span><span class="k">each</span><span class="w"> </span><span class="nl">master</span><span class="p">:</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">Service_Rate</span><span class="o">[</span><span class="n">master</span><span class="o">]</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">Min_Service_Rate</span><span class="p">)</span><span class="w"> </span><span class="err">{</span>
+<span class="w">        </span><span class="n">Flag_Master_Starvation</span><span class="p">(</span><span class="n">master</span><span class="p">);</span>
+<span class="w">        </span><span class="n">Reserve_Emergency_Bandwidth</span><span class="p">(</span><span class="n">master</span><span class="p">);</span>
+<span class="w">    </span><span class="err">}</span>
+</code></pre></div>
+
+<p><strong>预防机制</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">保证最小份额</span><span class="err">：</span>
+<span class="w">   </span><span class="n">每个主设备保证最小带宽</span>
+<span class="w">   </span><span class="n">Reserved_BW</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">Min_Required</span><span class="o">[</span><span class="n">i</span><span class="o">]</span>
+
+<span class="mf">2.</span><span class="w"> </span><span class="n">轮询机制</span><span class="err">：</span>
+<span class="w">   </span><span class="n">定期强制轮询所有队列</span>
+<span class="w">   </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="k">Cycle</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="n">Round_Robin_Period</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="err">{</span>
+<span class="w">      </span><span class="n">Service_Next_Queue</span><span class="p">();</span>
+<span class="w">   </span><span class="err">}</span>
+
+<span class="mf">3.</span><span class="w"> </span><span class="n">优先级上限</span><span class="err">：</span>
+<span class="w">   </span><span class="n">限制高优先级连续服务次数</span>
+<span class="w">   </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">High_Priority_Count</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">Max_Consecutive</span><span class="p">)</span><span class="w"> </span><span class="err">{</span>
+<span class="w">      </span><span class="n">Force_Service_Lower_Priority</span><span class="p">();</span>
+<span class="w">   </span><span class="err">}</span>
+</code></pre></div>
+
+<h3 id="653-wfq">6.5.3 加权公平队列（WFQ）</h3>
+<p>实现加权公平调度：</p>
+<div class="codehilite"><pre><span></span><code><span class="n">虚拟时间系统</span><span class="err">：</span>
+<span class="n">Virtual_Time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Service_Amount</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">Weight</span>
+
+<span class="n">调度算法</span><span class="err">：</span>
+
+<span class="mf">1.</span><span class="w"> </span><span class="n">计算虚拟完成时间</span>
+<span class="w">   </span><span class="n">Virtual_Finish</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Virtual_Start</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="k">Size</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">Weight</span><span class="o">[</span><span class="n">i</span><span class="o">]</span>
+
+<span class="mf">2.</span><span class="w"> </span><span class="n">选择最小虚拟完成时间的请求</span>
+<span class="w">   </span><span class="n">Next_Request</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">min</span><span class="p">(</span><span class="n">Virtual_Finish</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="p">)</span>
+
+<span class="mf">3.</span><span class="w"> </span><span class="n">更新虚拟时间</span>
+<span class="w">   </span><span class="n">Virtual_Start</span><span class="o">[</span><span class="n">next</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">max</span><span class="p">(</span><span class="n">Virtual_Time</span><span class="p">,</span><span class="w"> </span><span class="n">Virtual_Finish</span><span class="o">[</span><span class="n">prev</span><span class="o">]</span><span class="p">)</span>
+
+<span class="n">示例执行</span><span class="err">：</span>
+<span class="nl">时刻T0</span><span class="p">:</span><span class="w"> </span>
+<span class="n">Master</span><span class="w"> </span><span class="n">A</span><span class="w"> </span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span><span class="err">:</span><span class="w"> </span><span class="n">VF</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">64</span><span class="o">/</span><span class="mi">2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">32</span><span class="w">  </span><span class="err">←</span><span class="w"> </span><span class="n">选中</span>
+<span class="n">Master</span><span class="w"> </span><span class="n">B</span><span class="w"> </span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="err">:</span><span class="w"> </span><span class="n">VF</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">64</span><span class="o">/</span><span class="mi">1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">64</span>
+
+<span class="nl">时刻T1</span><span class="p">:</span>
+<span class="n">Master</span><span class="w"> </span><span class="n">A</span><span class="w"> </span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span><span class="err">:</span><span class="w"> </span><span class="n">VF</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">32</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">64</span><span class="o">/</span><span class="mi">2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">64</span>
+<span class="n">Master</span><span class="w"> </span><span class="n">B</span><span class="w"> </span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="err">:</span><span class="w"> </span><span class="n">VF</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">64</span><span class="o">/</span><span class="mi">1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">64</span><span class="w">  </span><span class="err">←</span><span class="w"> </span><span class="n">选中</span>
+
+<span class="n">带宽比例</span><span class="w"> </span><span class="nl">A</span><span class="p">:</span><span class="n">B</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="err">:</span><span class="mi">1</span><span class="w"> </span><span class="p">(</span><span class="n">符合权重比</span><span class="p">)</span>
+</code></pre></div>
+
+<h2 id="66">6.6 本章小结</h2>
+<p>本章深入探讨了DDR控制器的QoS机制和仲裁策略设计。关键要点包括：</p>
+<ol>
+<li>
+<p><strong>QoS需求建模</strong>：不同主设备有不同的性能需求特征，需要建立量化模型来描述延迟、带宽和实时性要求。</p>
+</li>
+<li>
+<p><strong>优先级调度</strong>：从静态优先级到动态提升，再到多级反馈队列，逐步解决饥饿和响应性问题。</p>
+</li>
+<li>
+<p><strong>带宽管理</strong>：通过信用机制和令牌桶算法，实现精确的带宽分配和流量控制。</p>
+</li>
+<li>
+<p><strong>延迟优化</strong>：识别关键路径，实施延迟敏感型调度，确保时延敏感请求得到及时响应。</p>
+</li>
+<li>
+<p><strong>公平性保证</strong>：通过加权公平队列和饥饿检测机制，在追求性能的同时保证系统公平性。</p>
+</li>
+</ol>
+<p>关键设计权衡：</p>
+<ul>
+<li>性能 vs 公平性：过度追求性能可能导致不公平</li>
+<li>复杂度 vs 效果：复杂算法带来的收益是否值得</li>
+<li>静态配置 vs 动态适应：如何平衡可预测性和灵活性</li>
+</ul>
+<h2 id="_2">练习题</h2>
+<h3 id="_3">基础题</h3>
+<p><strong>练习6.1：优先级计算</strong>
+某DDR控制器使用动态优先级提升机制，基础优先级范围0-3，老化因子为0.01/周期。如果一个优先级为1的请求已等待200周期，其当前有效优先级是多少？</p>
+<details>
+<summary>答案</summary>
+<p>有效优先级 = 基础优先级 + 老化因子 × 等待时间
+= 1 + 0.01 × 200
+= 1 + 2
+= 3</p>
+<p>该请求的有效优先级提升到了3（最高优先级）。</p>
+</details>
+<p><strong>练习6.2：带宽分配计算</strong>
+系统总带宽12.8 GB/s，四个主设备的权重分别为4:3:2:1。请计算每个设备的理论分配带宽。</p>
+<details>
+<summary>答案</summary>
+<p>总权重 = 4 + 3 + 2 + 1 = 10</p>
+<p>设备1：12.8 × 4/10 = 5.12 GB/s
+设备2：12.8 × 3/10 = 3.84 GB/s<br />
+设备3：12.8 × 2/10 = 2.56 GB/s
+设备4：12.8 × 1/10 = 1.28 GB/s</p>
+<p>验证：5.12 + 3.84 + 2.56 + 1.28 = 12.8 GB/s ✓</p>
+</details>
+<p><strong>练习6.3：信用机制</strong>
+某主设备初始信用值100，每发送一个64字节请求消耗8个信用，每周期补充2个信用。如果连续发送请求，最多能发送几个请求后信用耗尽？</p>
+<details>
+<summary>答案</summary>
+<p>设可以发送n个请求，每个请求需要4个周期（64字节/16字节每周期）。</p>
+<p>发送n个请求消耗的信用：8n
+发送n个请求期间补充的信用：2 × 4 × (n-1) = 8(n-1)</p>
+<p>信用平衡方程：
+100 + 8(n-1) ≥ 8n
+100 + 8n - 8 ≥ 8n
+92 ≥ 0</p>
+<p>这表明在稳态下，补充速率等于消耗速率，可以无限发送。</p>
+<p>但初始阶段：
+第1个请求后：100 - 8 = 92
+第2个请求后：92 + 8 - 8 = 92
+...
+可以持续发送，系统处于平衡状态。</p>
+<p>初始的100个信用可以提供92/8 ≈ 11个请求的缓冲。</p>
+</details>
+<h3 id="_4">挑战题</h3>
+<p><strong>练习6.4：调度算法设计</strong>
+设计一个调度算法，满足以下要求：</p>
+<ul>
+<li>CPU请求平均延迟 &lt; 100ns</li>
+<li>GPU保证带宽 ≥ 4GB/s</li>
+<li>Display硬实时deadline 16.67ms刷新一帧</li>
+<li>公平性指数 &gt; 0.9</li>
+</ul>
+<p>请描述你的算法框架和关键参数。</p>
+<details>
+<summary>答案</summary>
+<p>混合调度算法框架：</p>
+<ol>
+<li>
+<p><strong>分级队列结构</strong>
+   - 实时队列（Display）：最高优先级，基于EDF调度
+   - 低延迟队列（CPU）：次高优先级，使用SJF
+   - 高带宽队列（GPU）：信用机制保证带宽
+   - 通用队列：WFQ保证公平性</p>
+</li>
+<li>
+<p><strong>调度策略</strong></p>
+</li>
+</ol>
+<div class="codehilite"><pre><span></span><code>if (Display.deadline_approaching()) {
+    service(Display);  // 绝对优先
+} else if (CPU.queue_not_empty() &amp;&amp; CPU.credits &gt; 0) {
+    service(CPU.shortest_job());
+} else if (GPU.credits &gt; threshold) {
+    service(GPU.burst_transfer());
+} else {
+    weighted_fair_queue();
+}
+</code></pre></div>
+
+<ol start="3">
+<li>
+<p><strong>关键参数</strong>
+   - Display deadline margin: 1ms（提前1ms开始传输）
+   - CPU信用补充率：2GB/s等效
+   - GPU最小信用：4GB/s等效
+   - 公平性检查周期：1000 cycles
+   - 饥饿超时：1000 cycles</p>
+</li>
+<li>
+<p><strong>动态调整</strong>
+   - 监测实际延迟和带宽
+   - 违反SLA时提升优先级
+   - 定期重新平衡权重</p>
+</li>
+</ol>
+</details>
+<p><strong>练习6.5：性能分析</strong>
+某系统实测数据显示：CPU平均延迟150ns（目标100ns），GPU实际带宽3.5GB/s（目标4GB/s），但Display从未错过deadline。分析可能的原因和优化方向。</p>
+<details>
+<summary>答案</summary>
+<p>问题分析：</p>
+<ol>
+<li>
+<p><strong>Display占用过多资源</strong>
+   - Display的硬实时要求导致其频繁抢占
+   - 可能存在过度保守的deadline margin
+   - Display的突发传输影响其他设备</p>
+</li>
+<li>
+<p><strong>可能的根因</strong>
+   - Display预留带宽过大
+   - CPU和GPU的优先级设置不当
+   - 缺乏有效的带宽隔离机制</p>
+</li>
+<li>
+<p><strong>优化方向</strong></p>
+</li>
+</ol>
+<p>a) 优化Display调度：</p>
+<ul>
+<li>减小deadline margin，从1ms调整到500us</li>
+<li>实施流量整形，平滑Display的突发请求</li>
+<li>使用双缓冲减少紧急程度</li>
+</ul>
+<p>b) 提升CPU性能：</p>
+<ul>
+<li>为CPU预留专用时隙</li>
+<li>实施快速路径，绕过常规仲裁</li>
+<li>增加CPU请求的老化因子</li>
+</ul>
+<p>c) 保证GPU带宽：</p>
+<ul>
+<li>增加GPU的保证信用值</li>
+<li>Display服务后优先补偿GPU</li>
+<li>实施带宽借用机制</li>
+</ul>
+<p>d) 系统级优化：</p>
+<ul>
+<li>调整Bank交织策略，减少冲突</li>
+<li>优化命令调度，提高并行度</li>
+<li>考虑时分复用（TDM）方案</li>
+</ul>
+<ol start="4">
+<li><strong>验证方案</strong>
+   - 逐项调整，测量影响
+   - 压力测试各种组合场景
+   - 长时间运行验证稳定性</li>
+</ol>
+</details>
+<p><strong>练习6.6：QoS违反处理</strong>
+设计一个QoS违反的检测和恢复机制，当检测到某个主设备的QoS持续不满足时，系统应该如何响应？</p>
+<details>
+<summary>答案</summary>
+<p>QoS违反处理机制：</p>
+<ol>
+<li><strong>检测机制</strong></li>
+</ol>
+<div class="codehilite"><pre><span></span><code>监测窗口：1000 cycles
+违反阈值：连续3个窗口不满足
+
+检测项目：
+
+<span class="k">-</span> 延迟违反：P99 &gt; Max_Latency
+<span class="k">-</span> 带宽违反：Average_BW &lt; Min_BW  
+<span class="k">-</span> Deadline违反：Miss_Count &gt; 0
+
+违反等级：
+
+<span class="k">-</span> Warning: 1个窗口违反
+<span class="k">-</span> Critical: 2个窗口违反
+<span class="k">-</span> Emergency: 3个窗口违反
+</code></pre></div>
+
+<ol start="2">
+<li><strong>分级响应策略</strong></li>
+</ol>
+<p><strong>Warning级别：</strong></p>
+<ul>
+<li>记录日志和统计</li>
+<li>微调优先级（+1）</li>
+<li>增加信用补充率10%</li>
+</ul>
+<p><strong>Critical级别：</strong></p>
+<ul>
+<li>触发中断通知软件</li>
+<li>大幅提升优先级（最高）</li>
+<li>预留紧急带宽</li>
+<li>限制低优先级设备</li>
+</ul>
+<p><strong>Emergency级别：</strong></p>
+<ul>
+<li>进入紧急模式</li>
+<li>暂停所有低优先级</li>
+<li>只服务违反QoS的设备</li>
+<li>可能需要系统级调整</li>
+</ul>
+<ol start="3">
+<li><strong>恢复机制</strong></li>
+</ol>
+<div class="codehilite"><pre><span></span><code>恢复条件：连续2个窗口满足QoS
+
+恢复步骤：
+
+1. 逐步降低优先级提升
+2. 释放预留资源
+3. 恢复正常调度
+4. 清除违反计数
+
+防震荡：
+
+- 设置冷却期(10个窗口)
+- 冷却期内不降低保护等级
+</code></pre></div>
+
+<ol start="4">
+<li>
+<p><strong>软件协同</strong>
+- 提供QoS违反中断
+- 软件可调整QoS参数
+- 支持动态策略切换
+- 提供详细诊断信息</p>
+</li>
+<li>
+<p><strong>自适应学习</strong>
+- 记录违反模式
+- 预测性调整
+- 建立场景库
+- 自动参数优化</p>
+</li>
+</ol>
+</details>
+<h2 id="gotchas">常见陷阱与错误 (Gotchas)</h2>
+<h3 id="1">1. 优先级反转问题</h3>
+<p><strong>陷阱</strong>：高优先级请求被已经在处理的低优先级请求阻塞
+<strong>解决</strong>：实施优先级继承或优先级天花板协议</p>
+<h3 id="2">2. 信用系统死锁</h3>
+<p><strong>陷阱</strong>：信用耗尽后无法恢复，导致饿死
+<strong>解决</strong>：设置最小信用保证和紧急信用机制</p>
+<h3 id="3">3. 过度优化延迟损害带宽</h3>
+<p><strong>陷阱</strong>：频繁切换来优化延迟，导致整体带宽下降
+<strong>解决</strong>：设置最小批处理大小，平衡延迟和吞吐量</p>
+<h3 id="4-qos">4. QoS参数设置不当</h3>
+<p><strong>陷阱</strong>：QoS参数之和超过系统能力
+<strong>解决</strong>：实施准入控制，验证QoS参数可行性</p>
+<h3 id="5">5. 公平性度量选择</h3>
+<p><strong>陷阱</strong>：使用单一指标无法反映真实公平性
+<strong>解决</strong>：结合多个指标，考虑不同时间尺度</p>
+<h3 id="6">6. 动态调整震荡</h3>
+<p><strong>陷阱</strong>：参数调整过于激进导致系统震荡
+<strong>解决</strong>：实施阻尼机制和渐进式调整</p>
+<h2 id="_5">最佳实践检查清单</h2>
+<h3 id="qos">QoS需求分析</h3>
+<ul>
+<li>[ ] 完整收集所有主设备的QoS需求</li>
+<li>[ ] 建立量化的QoS模型和SLA</li>
+<li>[ ] 验证总体需求不超过系统能力</li>
+<li>[ ] 考虑最坏情况下的资源竞争</li>
+</ul>
+<h3 id="_6">仲裁机制设计</h3>
+<ul>
+<li>[ ] 实现多级优先级支持</li>
+<li>[ ] 包含动态优先级提升机制</li>
+<li>[ ] 设计饥饿检测和预防机制</li>
+<li>[ ] 支持紧急请求快速通道</li>
+</ul>
+<h3 id="_7">带宽管理</h3>
+<ul>
+<li>[ ] 实施带宽预留和保证机制</li>
+<li>[ ] 设计灵活的信用系统</li>
+<li>[ ] 支持突发流量处理</li>
+<li>[ ] 包含带宽违反检测</li>
+</ul>
+<h3 id="_8">延迟优化</h3>
+<ul>
+<li>[ ] 识别和标记关键路径</li>
+<li>[ ] 实施延迟敏感型调度</li>
+<li>[ ] 监测和统计延迟分布</li>
+<li>[ ] 支持延迟目标设置</li>
+</ul>
+<h3 id="_9">公平性保证</h3>
+<ul>
+<li>[ ] 选择合适的公平性度量</li>
+<li>[ ] 实施加权公平机制</li>
+<li>[ ] 定期评估公平性指标</li>
+<li>[ ] 包含公平性违反告警</li>
+</ul>
+<h3 id="_10">系统集成</h3>
+<ul>
+<li>[ ] 提供软件可配置接口</li>
+<li>[ ] 支持运行时策略切换</li>
+<li>[ ] 实现性能监测接口</li>
+<li>[ ] 包含调试和诊断功能</li>
+</ul>
+<h3 id="_11">验证测试</h3>
+<ul>
+<li>[ ] 覆盖各种负载组合</li>
+<li>[ ] 测试极限场景</li>
+<li>[ ] 验证QoS保证</li>
+<li>[ ] 长时间稳定性测试</li>
+</ul>
+            </article>
+            
+            <nav class="page-nav"><a href="chapter5.html" class="nav-link prev">← 第5章：时序参数与控制策略</a><a href="chapter7.html" class="nav-link next">第7章：功耗优化技术 →</a></nav>
+        </main>
+    </div>
+</body>
+</html>
